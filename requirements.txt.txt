@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+groq
+streamlit
+pandas
+scikit-learn
+plotly
+pytest
+httpx
