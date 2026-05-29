@@ -48,6 +48,8 @@ class ExtractionResult(BaseModel):
     confidence_score: float = Field(..., ge=0.0, le=1.0)
     validation_status: str = Field(..., description="pending, approved, review_required")
     processed_at: str
+    # TAMBAHKAN BARIS INI
+    fallback_action: Optional[dict] = None
 
 class HealthCheck(BaseModel):
     """Schema untuk health check endpoint"""
@@ -220,18 +222,38 @@ async def extract_clinical_data(note: ClinicalNoteInput):
         "diagnosis": "Hypertension" if vitals and vitals.get("bp_systolic", 0) > 130 else None
     }
     
-    # 4. CALL FMR SCORING ENGINE ✨ NEW!
+        # ... (kode extraction sebelumnya tetap sama) ...
+
+    # 4. CALL FMR SCORING ENGINE
     fmr_result = calculate_fmr_score(extracted_data, text)
-    
-    # 5. Determine validation status berdasarkan FMR score
+
+    # 5. Determine validation status & Fallback Action
+    fallback_action = None
+    validation_status = "pending" # Default
+
     if fmr_result["overall_score"] >= 0.7:
         validation_status = "approved"
+        # Tidak perlu action, langsung approved
+
     elif fmr_result["overall_score"] >= 0.4:
         validation_status = "review_required"
+        # FALLBACK: Score sedang -> Minta review manusia
+        fallback_action = {
+            "action": "route_to_human_review",
+            "reason": "Confidence score moderate. Data partially extracted.",
+            "priority": "medium"
+        }
+    
     else:
         validation_status = "rejected"
-    
-    # 6. Return Result dengan FMR details
+        # FALLBACK: Score rendah -> Tolak / Minta input ulang
+        fallback_action = {
+            "action": "request_re_submission",
+            "reason": "Data too incomplete or inconsistent for extraction.",
+            "priority": "high"
+        }
+
+    # 6. Return Result (Jangan lupa sertakan fallback_action!)
     return {
         "note_id": note.note_id,
         "medications": meds_found,
@@ -239,8 +261,10 @@ async def extract_clinical_data(note: ClinicalNoteInput):
         "diagnosis": extracted_data["diagnosis"],
         "confidence_score": fmr_result["overall_score"],
         "validation_status": validation_status,
+        "fallback_action": fallback_action, # <--- PENTING
         "processed_at": datetime.now().isoformat()
     }
+
 
 @app.get("/docs-info", tags=["Documentation"])
 async def docs_info():
