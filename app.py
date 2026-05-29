@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import requests
 import json
@@ -17,7 +18,12 @@ st.markdown("AI-powered clinical note extraction and validation")
 
 # Sidebar
 st.sidebar.header("Configuration")
-api_url = st.sidebar.text_input("API URL", "http://localhost:8000")
+# api_url = st.sidebar.text_input("API URL", "http://localhost:8000")
+# Cek apakah environment variable API_URL ada, kalau tidak pakai default
+api_default_url = os.getenv("API_URL", "http://api:8000")
+
+# Sidebar Input
+api_url = st.sidebar.text_input("API URL", api_default_url)
 
 # Main tabs
 tab1, tab2, tab3 = st.tabs(["Extraction", "Metrics", "About"])
